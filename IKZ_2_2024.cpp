@@ -175,19 +175,196 @@ void Hook_Jeeves(int Jchoice, double* masX, double* masLambda, int& step, double
             research = true;
             find = true;
         }
-        //cout << fixed;
-        //cout.precision(2);
-        //cout << research << " " << find << "   ";
-        //cout << second_masX[0] << " " << second_masX[1] << " " << second_masX[2] << "    " << masLambda[0] << " " << masLambda[1] << " " << masLambda[2] << endl;
     } 
     for (int i = 0; i < 3; i++) // В массив засовываем ответ
     {
         masX[i] = second_masX[i];
     }
 }
-
-void Steepest_descent()
+// Поиск дельта для метода Нельдера-Мида
+void delta_for_nelder_mid(int Jchoice, int N, double** masX, double& delta)
 {
+    double tau = 0;
+    delta = 0;
+    for (int i = 0; i < N + 1; i++)
+    {
+        tau += J(Jchoice, masX[i]);
+    }
+    tau /= (N + 1);
+    for (int i = 0; i < N + 1; i++)
+    {
+        delta += pow(J(Jchoice, masX[i]) - tau, 2);
+    }
+    delta /= (N + 1);
+    delta = sqrt(delta);
+}
+// Метод Нелдера-Мида
+double* Nelder_mid(int Jchoice, int&step, double eps)
+{
+    srand(time(0)); // Необходимо, чтобы потом выровнить многогранник
+    int N = Jchoice + 1;
+    // Коэфициент отражения
+    double alpha = 1;
+    double betta = 0.5;
+    double gamma = 2;
+    double* Otvet = new double[N];
+    double** masX = new double* [N + 1];
+    for (int i = 0; i < N + 1; i++)
+    {
+        masX[i] = new double[N];
+    }
+    // Вводим значения
+    for (int i = 0; i < N + 1; i++)
+    {
+        cout << "Enter x" << i + 1 << " :\n";
+        for (int j = 0; j < N; j++)
+        {
+            cin >> masX[i][j];
+        }
+        cout << "\n";
+    }
+    double* masX_max = new double[N]; // Точка самой тяжелой
+    double* masX_min = new double[N]; // Точка самой легкой
+    double* masX_center = new double[N]; // Точка центральной точки
+    double* new_masX = new double[N]; // Точка центральной точки
+    int X_max = 0; // Место максимальной точки среди всех точек
+    int X_min = 0; // Место минимальной точки среди всех точек
+    double delta = eps * 100; // Переменная для выхода
+    for (int j = 0; j < N; j++) // Приравниваем значения к первой точке
+    {
+        masX_max[j] = masX[0][j];
+        masX_max[j] = masX[0][j];
+    }
+    while (delta >= eps)
+    {
+        // Поиск максимума и минимума
+        for (int i = 0; i < N + 1; i++)
+        {
+            double new_J = J(Jchoice, masX[i]);
+            if (new_J > J(Jchoice, masX_max)) // Ищем максимум
+            {
+                for (int j = 0; j < N; j++)
+                {
+                    masX_max[j] = masX[i][j];
+                    X_max = i;
+                }
+            }
+            if (new_J < J(Jchoice, masX_min)) // Ищем минимум
+            {
+                for (int j = 0; j < N; j++)
+                {
+                    masX_min[j] = masX[i][j];
+                    X_min = i;
+                }
+            }
+        }
+        for (int j = 0; j < N; j++)
+        {
+            masX_center[j] = 0; // Снова ищем центральную точку
+        }
+        // Поиск центральной точки
+        for (int i = 0; i < N + 1; i++)
+        {
+            if (X_max != i)
+            {
+                for (int j = 0; j < N; j++)
+                {
+
+                    masX_center[j] += masX[i][j];
+                }
+            }
+        }
+        for (int i = 0; i < N; i++) // Осредняем
+        {
+            masX_center[i] /= N;
+        }
+        // Отражаем
+        double* masX_rejected = new double[N]; // Отраженная точка
+        for (int i = 0; i < N; i++)
+        {
+            masX_rejected[i] = (1 + alpha) * masX_center[i] - alpha * masX_max[i]; // Отражаем точку
+        }
+        // Расстяжение
+        if (J(Jchoice, masX_rejected) <= J(Jchoice, masX_min))
+        {
+            for (int i = 0; i < N + 1; i++)
+            {
+                if (X_max != i)
+                {
+                    for (int j = 0; j < N; j++)
+                    {
+                        masX[i][j] = gamma * masX_rejected[j] + (1 - betta) * masX_center[j]; //Расстягиваем
+                    }
+                }
+            }
+        }
+        // Сжатие
+        if (J(Jchoice, masX_rejected) > J(Jchoice, masX_min) && J(Jchoice, masX_rejected) < J(Jchoice, masX_max))
+        {
+            for (int i = 0; i < N + 1; i++)
+            {
+                if (X_max != i)
+                {
+                    for (int j = 0; j < N; j++)
+                    {
+                        masX[i][j] = betta * masX_center[j] + (1 - betta) * masX_rejected[j]; // Сжимаем
+                    }
+                }
+            }
+        }
+        // Уменьшение
+        if (J(Jchoice, masX_rejected) >= J(Jchoice, masX_max))
+        {
+            for (int i = 0; i < N + 1; i++)
+            {
+                if (X_min != i)
+                {
+                    for (int j = 0; j < N; j++)
+                    {
+                        masX[i][j] = masX_min[j] + 0.5 * (masX[i][j] - masX_min[j]); // Уменьшаем все кроме минимальной
+                    }
+                }
+            }
+        }
+        cout << "Min = ";
+        for (int i = 0; i < N; i++)
+        {
+            cout << masX_min[i] << " ";
+        }
+        cout << "\nMax = ";
+        for (int i = 0; i < N; i++)
+        {
+            cout << masX_max[i] << " ";
+        }
+        cout << "\ndelta = " << delta << "\n\n";
+        delta_for_nelder_mid(Jchoice, N, masX, delta);
+        step++;
+        if (step % 10 == 0) // Каждую десятую точку выправляем многогранник
+        {
+            for (int i = 0; i < N + 1; i++)
+            {
+                if (X_min != i)
+                {
+                    for (int j = 0; j < N; j++)
+                    {
+                        if (rand() % 2 == 0)
+                        {
+                            masX[i][j] = masX[i][j] + rand() % 3;
+                        }
+                        else
+                        {
+                            masX[i][j] = masX[i][j] - rand() % 3;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    for (int i = 0; i < N; i++)
+    {
+        Otvet[i] = masX_min[i];
+    }
+    return Otvet;
 }
 // Отрез кодов друг от друга
 void separator()
@@ -205,16 +382,19 @@ int main()
     cout << "Choose J:\n1) 2*x1^2 - 2*x1*x2 + 3*x2^2 + x1 - 3*x2\n2) 5*x1^2 + 3*x2^2 + 2*x3^2 + 2*x1*x2 + x1*x3 + x2*x3 + 5*x1 + x3\n\nYour choice: ";
     cin >> Jchoice;
     separator();
-    cout << "Choice x1=";
-    cin >> masX[0];
-    cout << "Choice x2=";
-    cin >> masX[1];
-    cout << "Choice x3=";
-    cin >> masX[2];
-    separator();
-    cout << "Choose method:\n1) Monotony condition\n2) etc\n3) Hook-Jeeves\n4) etc\n\nYour choice:";
+    cout << "Choose method:\n1) Monotony condition\n2) etc\n3) Hook-Jeeves\n4) Nelder-Mid\n\nYour choice:";
     cin >> Mchoice;
     separator();
+    if (Mchoice != 4) // Для метода Нелдера-Мида надо несколько точек, а не одна
+    {
+        cout << "Choice x1=";
+        cin >> masX[0];
+        cout << "Choice x2=";
+        cin >> masX[1];
+        cout << "Choice x3=";
+        cin >> masX[2];
+        separator();
+    }
     double alpha; // Шаг для 1-го метода
     int step = 0;
     double* masLambda = new double[3];
@@ -241,8 +421,8 @@ int main()
     case 3:
         Hook_Jeeves(Jchoice, masX, masLambda, step, eps);
         break;
-    default:
-        cout << "Inccorect choice (method)\n";
+    case 4:
+        masX = Nelder_mid(Jchoice, step, eps);
         break;
     }
     if (Jchoice != 1)
