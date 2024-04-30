@@ -185,7 +185,7 @@ void Hook_Jeeves(int Jchoice, double* masX, double* masLambda, int& step, double
         masX[i] = second_masX[i];
     }
 }
-// Поиск дельта для метода Нельдера-Мида
+// Поиск дельта для метода Нельдера-Мида 
 void delta_for_nelder_mid(int Jchoice, int N, double** masX, double& delta)
 {
     double tau = 0;
