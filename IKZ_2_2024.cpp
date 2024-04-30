@@ -28,26 +28,20 @@ double grad_J(int Jchoice, double* X, int component)
         {
         case 0:
             return 4 * X[0] - 2 * X[1] + 1;
-            break;
         case 1:
             return -2 * X[0] + 6 * X[1] - 3;
-            break;
         case 2:
             return 0;
-            break;
         }
     case 2:
         switch (component)
         {
         case 0:
             return 10 * X[0] + 2 * X[1] + X[2] + 5;
-            break;
         case 1:
             return 6 * X[1] + 2 * X[0] + X[2];
-            break;
         case 2:
             return 4 * X[2] + X[0] + X[1] + 1;
-            break;
         }
         break;
     }
@@ -88,6 +82,7 @@ void Hook_Jeeves(int Jchoice, double* masX, double* masLambda, int& step, double
     bool research = true; // Проверка на получение базисной точки из исследующего поиска
     bool find = true; // Проверка на получение точки из поиска по образцу
     double Lambda = 1;
+    int res_exit = 0;
     for (int i = 0; i < 3; i++) // Задаем начальные условия
     {
         previous_masX[i] = masX[i];
@@ -162,7 +157,7 @@ void Hook_Jeeves(int Jchoice, double* masX, double* masLambda, int& step, double
         {
             Lambda += masLambda[i]; // Поиск погрешности
         }
-        if (find == false && research == false) // Проверка на уменьшение
+        if ((find == false && research == false) || res_exit == 5) // Проверка на уменьшение
         {
             for (int i = 0; i < 3; i++) // Меняем сходимость и новые начальные условия
             {
@@ -175,6 +170,15 @@ void Hook_Jeeves(int Jchoice, double* masX, double* masLambda, int& step, double
             research = true;
             find = true;
         }
+        if (research == false && find == true)
+        {
+            res_exit++;
+        }
+        else
+        {
+            res_exit = 0;
+        }
+        step++;
     } 
     for (int i = 0; i < 3; i++) // В массив засовываем ответ
     {
@@ -199,7 +203,7 @@ void delta_for_nelder_mid(int Jchoice, int N, double** masX, double& delta)
     delta = sqrt(delta);
 }
 // Метод Нелдера-Мида
-double* Nelder_mid(int Jchoice, int&step, double eps)
+double* Nelder_mid(int Jchoice, int& step, double eps)
 {
     srand(time(0)); // Необходимо, чтобы потом выровнить многогранник
     int N = Jchoice + 1;
@@ -235,7 +239,7 @@ double* Nelder_mid(int Jchoice, int&step, double eps)
         masX_max[j] = masX[0][j];
         masX_max[j] = masX[0][j];
     }
-    while (delta >= eps)
+    while (delta >= eps *eps)
     {
         // Поиск максимума и минимума
         for (int i = 0; i < N + 1; i++)
@@ -326,6 +330,7 @@ double* Nelder_mid(int Jchoice, int&step, double eps)
                 }
             }
         }
+        /*
         cout << "Min = ";
         for (int i = 0; i < N; i++)
         {
@@ -337,6 +342,7 @@ double* Nelder_mid(int Jchoice, int&step, double eps)
             cout << masX_max[i] << " ";
         }
         cout << "\ndelta = " << delta << "\n\n";
+        */
         delta_for_nelder_mid(Jchoice, N, masX, delta);
         step++;
         if (step % 10 == 0) // Каждую десятую точку выправляем многогранник
@@ -367,26 +373,29 @@ double* Nelder_mid(int Jchoice, int&step, double eps)
     return Otvet;
 }
 // Облегчение написания функции фи
-double phi(int Jchoice, double* masX, double alpha, int component)
+void phi(int Jchoice, double* mas_phi, double alpha)
 {
-    return J(Jchoice, masX) - alpha * grad_J(Jchoice, masX, component);
+    double* new_mas = new double[3];
+    for (int i = 0; i < 3; i++)
+    {
+        new_mas[i] = mas_phi[i] - alpha * grad_J(Jchoice, mas_phi, i);
+    }
+    for (int i = 0; i < 3; i++)
+    {
+        mas_phi[i] = new_mas[i];
+    }
 }
 // Функция J для метода деления пополам
-double fast_J(int Jch, double* masX, double alf)
+double fast_J(int Jchoice, double* masX, double alpha)
 {
-    double x1, x2, x3;
-    switch (Jch)
+    double* mas_phi = new double[3];
+    phi(Jchoice, mas_phi, alpha);
+    switch (Jchoice)
     {
     case 1:
-        x1 = phi(Jch, masX, alf, 0);
-        x2 = phi(Jch, masX, alf, 2);
-        return 2 * pow(x1, 2) - 2 * x1 * x2 + 3 * pow(x2, 2) + x1 - 3 * x2;
+        return 2 * pow(mas_phi[0], 2) - 2 * mas_phi[0] * mas_phi[1] + 3 * pow(mas_phi[1], 2) + mas_phi[0] - 3 * mas_phi[1];
     case 2:
-        x1 = phi(Jch, masX, alf, 0);
-        x2 = phi(Jch, masX, alf, 2);
-        x3 = phi(Jch, masX, alf, 3);
-        return 5 * pow(x1, 2) + 3 * pow(x2, 2) + 2 * pow(x3, 2) + 2 * x1 * x2 + x1 * x3 + x2 * x3 + 5 * x1 + x3;
-        return 0;
+        return 5 * pow(mas_phi[0], 2) + 3 * pow(mas_phi[1], 2) + 2 * pow(mas_phi[2], 2) + 2 * mas_phi[0] * mas_phi[1] + mas_phi[0] * mas_phi[2] + mas_phi[1] * mas_phi[2] + 5 * mas_phi[0] + mas_phi[2];
     }
 }
 // Метод Половинного деления
@@ -409,11 +418,12 @@ double HalfDivision(int Jchoice, double A, double B, double* masX, double EPS)
 // Метод Наискорейшего спуска
 void Fastes(int Jchoice, double* masX, int& step, double eps)
 {
-    double alpha = HalfDivision(Jchoice, -1000, 1000, masX, eps);
+    double alpha = HalfDivision(Jchoice, 0, 100, masX, eps);
     double* masY = new double[3];
-    while (alpha >= eps)
+    int exit = 0;
+    while (alpha >= eps * eps && exit !=5)
     {
-        bool half_alpha = true;
+        alpha = HalfDivision(Jchoice, 0, 1000, masX, eps);
         masY[0] = masX[0] - alpha * grad_J(Jchoice, masX, 0);
         masY[1] = masX[1] - alpha * grad_J(Jchoice, masX, 1);
         masY[2] = masX[2] - alpha * grad_J(Jchoice, masX, 2);
@@ -423,11 +433,11 @@ void Fastes(int Jchoice, double* masX, int& step, double eps)
             {
                 masX[i] = masY[i];
             }
-            half_alpha = false;
+            exit = 0;
         }
-        if (half_alpha)
+        else
         {
-            alpha /= 2;
+            exit++;
         }
         step++;
     }
@@ -448,7 +458,7 @@ int main()
     cout << "Choose J:\n1) 2*x1^2 - 2*x1*x2 + 3*x2^2 + x1 - 3*x2\n2) 5*x1^2 + 3*x2^2 + 2*x3^2 + 2*x1*x2 + x1*x3 + x2*x3 + 5*x1 + x3\n\nYour choice: ";
     cin >> Jchoice;
     separator();
-    cout << "Choose method:\n1) Monotony condition\n2) etc\n3) Hook-Jeeves\n4) Nelder-Mid\n\nYour choice:";
+    cout << "Choose method:\n1) Monotony condition\n2) Fastet down\n3) Hook-Jeeves\n4) Nelder-Mid\n\nYour choice:";
     cin >> Mchoice;
     separator();
     if (Mchoice != 4) // Для метода Нелдера-Мида надо несколько точек, а не одна
@@ -484,6 +494,7 @@ int main()
         break;
     case 2:
         Fastes(Jchoice, masX, step, eps);
+        step -= 5;
         break;
     case 3:
         Hook_Jeeves(Jchoice, masX, masLambda, step, eps);
