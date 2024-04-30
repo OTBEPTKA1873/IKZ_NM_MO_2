@@ -366,6 +366,72 @@ double* Nelder_mid(int Jchoice, int&step, double eps)
     }
     return Otvet;
 }
+// Облегчение написания функции фи
+double phi(int Jchoice, double* masX, double alpha, int component)
+{
+    return J(Jchoice, masX) - alpha * grad_J(Jchoice, masX, component);
+}
+// Функция J для метода деления пополам
+double fast_J(int Jch, double* masX, double alf)
+{
+    double x1, x2, x3;
+    switch (Jch)
+    {
+    case 1:
+        x1 = phi(Jch, masX, alf, 0);
+        x2 = phi(Jch, masX, alf, 2);
+        return 2 * pow(x1, 2) - 2 * x1 * x2 + 3 * pow(x2, 2) + x1 - 3 * x2;
+    case 2:
+        x1 = phi(Jch, masX, alf, 0);
+        x2 = phi(Jch, masX, alf, 2);
+        x3 = phi(Jch, masX, alf, 3);
+        return 5 * pow(x1, 2) + 3 * pow(x2, 2) + 2 * pow(x3, 2) + 2 * x1 * x2 + x1 * x3 + x2 * x3 + 5 * x1 + x3;
+        return 0;
+    }
+}
+// Метод Половинного деления
+double HalfDivision(int Jchoice, double A, double B, double* masX, double EPS)
+{
+    double x1 = A, x2 = B, delta = EPS / 2; // Динамическая граница метода деления пополам
+    do
+    {
+        if (fast_J(Jchoice, masX, (x1 + x2 - delta) / 2) <= fast_J(Jchoice, masX, (x1 + x2 + delta) / 2))
+        {
+            x2 = (x1 + x2 + delta) / 2;
+        }
+        else
+        {
+            x1 = (x1 + x2 - delta) / 2;
+        }
+    } while (abs(x2 - x1) > EPS);
+    return (x1 + x2) / 2;
+}
+// Метод Наискорейшего спуска
+void Fastes(int Jchoice, double* masX, int& step, double eps)
+{
+    double alpha = HalfDivision(Jchoice, -1000, 1000, masX, eps);
+    double* masY = new double[3];
+    while (alpha >= eps)
+    {
+        bool half_alpha = true;
+        masY[0] = masX[0] - alpha * grad_J(Jchoice, masX, 0);
+        masY[1] = masX[1] - alpha * grad_J(Jchoice, masX, 1);
+        masY[2] = masX[2] - alpha * grad_J(Jchoice, masX, 2);
+        if (J(Jchoice, masX) > J(Jchoice, masY))
+        {
+            for (int i = 0; i < 3; i++)
+            {
+                masX[i] = masY[i];
+            }
+            half_alpha = false;
+        }
+        if (half_alpha)
+        {
+            alpha /= 2;
+        }
+        step++;
+    }
+}
 // Отрез кодов друг от друга
 void separator()
 {
@@ -417,6 +483,7 @@ int main()
         Monotony_condition_3_0(Jchoice, masX, alpha, step, eps);
         break;
     case 2:
+        Fastes(Jchoice, masX, step, eps);
         break;
     case 3:
         Hook_Jeeves(Jchoice, masX, masLambda, step, eps);
